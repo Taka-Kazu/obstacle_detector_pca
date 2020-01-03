@@ -6,6 +6,7 @@ ObstacleDetectorPCA::ObstacleDetectorPCA(void)
     downsampled_cloud_pub = local_nh.advertise<sensor_msgs::PointCloud2>("downsampled_cloud", 1);
     clustered_cloud_pub = local_nh.advertise<sensor_msgs::PointCloud2>("clustered_cloud", 1);
     bb_pub = local_nh.advertise<visualization_msgs::MarkerArray>("bounding_boxes", 1);
+    obstacle_removed_cloud_pub = nh.advertise<sensor_msgs::PointCloud2>("/cloud/obstacle_removed", 1);
     cloud_sub = nh.subscribe("/velodyne_obstacles", 1, &ObstacleDetectorPCA::cloud_callback, this, ros::TransportHints().reliable().tcpNoDelay(true));
 
     local_nh.param<double>("LEAF_SIZE", LEAF_SIZE, {0.1});
@@ -63,6 +64,8 @@ void ObstacleDetectorPCA::cloud_callback(const sensor_msgs::PointCloud2ConstPtr&
     get_euclidean_clusters(cluster_indices, clusters);
     std::cout << "time: " << ros::Time::now().toSec() - start_time << "[s]" << std::endl;
 
+    pcl::PointIndices::Ptr remove_indices(new pcl::PointIndices());
+
     visualization_msgs::MarkerArray bbs;
     int cluster_num = clusters.size();
     std::cout << "cluster num: " << cluster_num << std::endl;
@@ -95,6 +98,7 @@ void ObstacleDetectorPCA::cloud_callback(const sensor_msgs::PointCloud2ConstPtr&
             continue;
         }
         if(is_human_cluster(centroid, scale)){
+            std::copy(cluster_indices[i].indices.begin(), cluster_indices[i].indices.end(), std::back_inserter(remove_indices->indices));
             bounding_box_lib::BoundingBox bb;
             bb.set_id(bbs_num);
             bb.set_frame_id(msg->header.frame_id);
@@ -126,6 +130,16 @@ void ObstacleDetectorPCA::cloud_callback(const sensor_msgs::PointCloud2ConstPtr&
     }
     bb_pub.publish(bbs);
     last_num_of_bbs = bbs_num;
+
+    std::cout << "remove points size: " << remove_indices->indices.size() << std::endl;
+    CloudXYZINPtr obstacle_removed_cloud_ptr = CloudXYZINPtr(new CloudXYZIN);
+    obstacle_removed_cloud_ptr->header = cloud_ptr->header;
+    pcl::ExtractIndices<PointXYZIN> extract;
+    extract.setInputCloud(cloud_ptr);
+    extract.setIndices(remove_indices);
+    extract.setNegative(true);
+    extract.filter(*obstacle_removed_cloud_ptr);
+    obstacle_removed_cloud_pub.publish(*obstacle_removed_cloud_ptr);
 
     std::cout << "time: " << ros::Time::now().toSec() - start_time << "[s]" << std::endl;
 }

@@ -60,6 +60,7 @@ private:
     ros::Publisher downsampled_cloud_pub;
     ros::Publisher clustered_cloud_pub;
     ros::Publisher bb_pub;
+    ros::Publisher obstacle_removed_cloud_pub;
     ros::Subscriber cloud_sub;
 
     CloudXYZINPtr cloud_ptr;
