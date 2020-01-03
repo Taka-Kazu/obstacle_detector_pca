@@ -2,6 +2,7 @@
 #define __OBSTACLE_DETECTOR_PCA_H
 
 #include <ros/ros.h>
+#include <geometry_msgs/PoseArray.h>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 
@@ -61,6 +62,7 @@ private:
     ros::Publisher clustered_cloud_pub;
     ros::Publisher bb_pub;
     ros::Publisher obstacle_removed_cloud_pub;
+    ros::Publisher obstacle_pose_pub;
     ros::Subscriber cloud_sub;
 
     CloudXYZINPtr cloud_ptr;

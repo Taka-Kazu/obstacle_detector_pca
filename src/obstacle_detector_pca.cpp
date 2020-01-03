@@ -7,6 +7,7 @@ ObstacleDetectorPCA::ObstacleDetectorPCA(void)
     clustered_cloud_pub = local_nh.advertise<sensor_msgs::PointCloud2>("clustered_cloud", 1);
     bb_pub = local_nh.advertise<visualization_msgs::MarkerArray>("bounding_boxes", 1);
     obstacle_removed_cloud_pub = nh.advertise<sensor_msgs::PointCloud2>("/cloud/obstacle_removed", 1);
+    obstacle_pose_pub = nh.advertise<geometry_msgs::PoseArray>("/dynamic_obstacles", 1);
     cloud_sub = nh.subscribe("/velodyne_obstacles", 1, &ObstacleDetectorPCA::cloud_callback, this, ros::TransportHints().reliable().tcpNoDelay(true));
 
     local_nh.param<double>("LEAF_SIZE", LEAF_SIZE, {0.1});
@@ -45,6 +46,9 @@ void ObstacleDetectorPCA::cloud_callback(const sensor_msgs::PointCloud2ConstPtr&
     std::cout << "=== obstacle_detector_pca ===" << std::endl;
 
     double start_time = ros::Time::now().toSec();
+
+    geometry_msgs::PoseArray obstacle_poses;
+    obstacle_poses.header = msg->header;
 
     pcl::fromROSMsg(*msg, *cloud_ptr);
     std::cout << "subscribed cloud size: " << cloud_ptr->points.size() << std::endl;
@@ -112,6 +116,12 @@ void ObstacleDetectorPCA::cloud_callback(const sensor_msgs::PointCloud2ConstPtr&
             std::cout << "centroid: " << centroid.transpose() << std::endl;
             std::cout << "scale: " << scale.transpose() << std::endl;
             std::cout << "cluster size: " << clusters[i]->points.size() << std::endl;;
+            geometry_msgs::Pose p;
+            p.position.x = centroid(0);
+            p.position.y = centroid(1);
+            p.position.z = centroid(2);
+            p.orientation = tf::createQuaternionMsgFromYaw(yaw);
+            obstacle_poses.poses.push_back(p);
             bbs_num++;
         }else{
             std::cout << "rejected" << std::endl;
@@ -140,6 +150,8 @@ void ObstacleDetectorPCA::cloud_callback(const sensor_msgs::PointCloud2ConstPtr&
     extract.setNegative(true);
     extract.filter(*obstacle_removed_cloud_ptr);
     obstacle_removed_cloud_pub.publish(*obstacle_removed_cloud_ptr);
+
+    obstacle_pose_pub.publish(obstacle_poses);
 
     std::cout << "time: " << ros::Time::now().toSec() - start_time << "[s]" << std::endl;
 }
