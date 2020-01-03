@@ -47,6 +47,9 @@ private:
     double MAX_HEIGHT;
     double MIN_WIDTH;
     double MAX_WIDTH;
+    double LIDAR_HEIGHT_FROM_GROUND;
+    double LIDAR_VERTICAL_FOV_UPPER;
+    double LIDAR_VERTICAL_FOV_LOWER;
 
     ros::NodeHandle nh;
     ros::NodeHandle local_nh;

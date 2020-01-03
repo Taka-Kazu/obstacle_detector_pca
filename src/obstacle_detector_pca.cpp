@@ -14,8 +14,11 @@ ObstacleDetectorPCA::ObstacleDetectorPCA(void)
     local_nh.param<int>("MAX_CLUSTER_SIZE", MAX_CLUSTER_SIZE, {2000});
     local_nh.param<double>("MIN_HEIGHT", MIN_HEIGHT, {1.5});
     local_nh.param<double>("MAX_HEIGHT", MAX_HEIGHT, {1.9});
-    local_nh.param<double>("MIN_WIDTH", MIN_WIDTH, {0.4});
+    local_nh.param<double>("MIN_WIDTH", MIN_WIDTH, {0.2});
     local_nh.param<double>("MAX_WIDTH", MAX_WIDTH, {1.0});
+    local_nh.param<double>("LIDAR_HEIGHT_FROM_GROUND", LIDAR_HEIGHT_FROM_GROUND, {1.2});
+    local_nh.param<double>("LIDAR_VERTICAL_FOV_UPPER", LIDAR_VERTICAL_FOV_UPPER, {10.67 * M_PI / 180.0});
+    local_nh.param<double>("LIDAR_VERTICAL_FOV_LOWER", LIDAR_VERTICAL_FOV_LOWER, {-30.67 * M_PI / 180.0});
 
     cloud_ptr = CloudXYZINPtr(new CloudXYZIN);
 
@@ -27,6 +30,9 @@ ObstacleDetectorPCA::ObstacleDetectorPCA(void)
     std::cout << "MAX_HEIGHT: "<< MAX_HEIGHT << std::endl;
     std::cout << "MIN_WIDTH: "<< MIN_WIDTH << std::endl;
     std::cout << "MAX_WIDTH: "<< MAX_WIDTH << std::endl;
+    std::cout << "LIDAR_HEIGHT_FROM_GROUND: "<< LIDAR_HEIGHT_FROM_GROUND << std::endl;
+    std::cout << "LIDAR_VERTICAL_FOV_UPPER: "<< LIDAR_VERTICAL_FOV_UPPER << std::endl;
+    std::cout << "LIDAR_VERTICAL_FOV_LOWER: "<< LIDAR_VERTICAL_FOV_LOWER << std::endl;
 }
 
 void ObstacleDetectorPCA::cloud_callback(const sensor_msgs::PointCloud2ConstPtr& msg)
@@ -59,12 +65,27 @@ void ObstacleDetectorPCA::cloud_callback(const sensor_msgs::PointCloud2ConstPtr&
     static int last_num_of_bbs = 0;
     std::cout << "last bb num: " << last_num_of_bbs << std::endl;
     int bbs_num = 0;
+    const double INNERMOST_RING_RADIUS = LIDAR_HEIGHT_FROM_GROUND / tan(fabs(LIDAR_VERTICAL_FOV_LOWER));
+    std::cout << "INNERMOST_RING_RADIUS: " << INNERMOST_RING_RADIUS << std::endl;
     for(int i=0;i<cluster_num;i++){
-        // std::cout << i << std::endl;;
+        std::cout << i << std::endl;;
         double yaw = 0;
         Eigen::Vector3d centroid;
         Eigen::Vector3d scale;
         principal_component_analysis(clusters[i], yaw, centroid, scale);
+        double distance = centroid.segment(0, 2).norm();
+        std::cout << "distance: " << distance << std::endl;
+        if(distance < INNERMOST_RING_RADIUS){
+            std::cout << "the obstacle is too close" << std::endl;
+            double height_from_distance = distance * (tan(LIDAR_VERTICAL_FOV_UPPER) + tan(fabs(LIDAR_VERTICAL_FOV_LOWER)));
+            std::cout << "height_from_distance: " << height_from_distance << std::endl;
+            std::cout << "height: " << scale(2) << std::endl;
+            if(fabs(scale(2) - height_from_distance) < 0.05){
+                std::cout << "filled with obstacle" << std::endl;
+                scale(2) = (MAX_HEIGHT + MIN_HEIGHT) * 0.5;
+                centroid(2) = scale(2) * 0.5 - LIDAR_HEIGHT_FROM_GROUND;
+            }
+        }
         if(MIN_HEIGHT < scale(2) && scale(2) < MAX_HEIGHT
            && MIN_WIDTH < scale(0) && scale(0) < MAX_WIDTH
            && MIN_WIDTH < scale(1) && scale(1) < MAX_WIDTH
