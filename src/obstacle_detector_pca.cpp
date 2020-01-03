@@ -90,6 +90,10 @@ void ObstacleDetectorPCA::cloud_callback(const sensor_msgs::PointCloud2ConstPtr&
                 centroid(2) = scale(2) * 0.5 - LIDAR_HEIGHT_FROM_GROUND;
             }
         }
+        if(!(MIN_HEIGHT < scale(2) && scale(2) < MAX_HEIGHT)){
+            std::cout << "invalid height" << std::endl;
+            continue;
+        }
         if(is_human_cluster(centroid, scale)){
             bounding_box_lib::BoundingBox bb;
             bb.set_id(bbs_num);
@@ -100,14 +104,16 @@ void ObstacleDetectorPCA::cloud_callback(const sensor_msgs::PointCloud2ConstPtr&
             bb.set_rgb(0, 200, 255);
             bb.calculate_vertices();
             bbs.markers.push_back(bb.get_bounding_box());
-            std::cout << "id: " << bbs_num << std::endl;
+            std::cout << "\033[32mid: " << bbs_num << "\033[0m" << std::endl;
             std::cout << "centroid: " << centroid.transpose() << std::endl;
             std::cout << "scale: " << scale.transpose() << std::endl;
+            std::cout << "cluster size: " << clusters[i]->points.size() << std::endl;;
             bbs_num++;
         }else{
             std::cout << "rejected" << std::endl;
             std::cout << "centroid: " << centroid.transpose() << std::endl;
             std::cout << "scale: " << scale.transpose() << std::endl;
+            std::cout << "cluster size: " << clusters[i]->points.size() << std::endl;;
         }
     }
     std::cout << "bbs num: " << bbs_num << std::endl;
@@ -237,9 +243,18 @@ void ObstacleDetectorPCA::principal_component_analysis(const CloudXYZINPtr& clus
 
 bool ObstacleDetectorPCA::is_human_cluster(const Eigen::Vector3d& centroid, const Eigen::Vector3d& scale)
 {
-    return MIN_HEIGHT < scale(2) && scale(2) < MAX_HEIGHT
-           && MIN_WIDTH < scale(0) && scale(0) < MAX_WIDTH
-           && MIN_LENGTH < scale(1) && scale(1) < MAX_LENGTH;
+    // return MIN_HEIGHT < scale(2) && scale(2) < MAX_HEIGHT
+    //        && MIN_WIDTH < scale(0) && scale(0) < MAX_WIDTH
+    //        && MIN_LENGTH < scale(1) && scale(1) < MAX_LENGTH;
+    return (MIN_HEIGHT < scale(2) && scale(2) < MAX_HEIGHT// walking
+           && 0.7 < scale(0) && scale(0) < 1.3
+           && 0.3 < scale(1) && scale(1) < 0.9)
+           || (MIN_HEIGHT < scale(2) && scale(2) < MAX_HEIGHT// stopping
+           && 0.4 < scale(0) && scale(0) < 0.7
+           && 0.2 < scale(1) && scale(1) < 0.5)
+           || (MIN_HEIGHT < scale(2) && scale(2) < MAX_HEIGHT// other
+           && 0.5 < scale(0) && scale(0) < 0.9
+           && 0.5 < scale(1) && scale(1) < 0.9);
 }
 
 void ObstacleDetectorPCA::process(void)
