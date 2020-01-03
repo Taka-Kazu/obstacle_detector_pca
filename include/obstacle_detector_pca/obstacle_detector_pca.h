@@ -36,6 +36,7 @@ public:
     void get_euclidean_cluster_indices(std::vector<pcl::PointIndices>&);
     void get_euclidean_clusters(const std::vector<pcl::PointIndices>&, std::vector<CloudXYZINPtr>&);
     void principal_component_analysis(const CloudXYZINPtr& cluster, double& yaw, Eigen::Vector3d&, Eigen::Vector3d&);
+    bool is_human_cluster(const Eigen::Vector3d&, const Eigen::Vector3d&);
     void process(void);
 
 private:
@@ -47,6 +48,8 @@ private:
     double MAX_HEIGHT;
     double MIN_WIDTH;
     double MAX_WIDTH;
+    double MIN_LENGTH;
+    double MAX_LENGTH;
     double LIDAR_HEIGHT_FROM_GROUND;
     double LIDAR_VERTICAL_FOV_UPPER;
     double LIDAR_VERTICAL_FOV_LOWER;

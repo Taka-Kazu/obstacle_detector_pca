@@ -14,8 +14,10 @@ ObstacleDetectorPCA::ObstacleDetectorPCA(void)
     local_nh.param<int>("MAX_CLUSTER_SIZE", MAX_CLUSTER_SIZE, {2000});
     local_nh.param<double>("MIN_HEIGHT", MIN_HEIGHT, {1.5});
     local_nh.param<double>("MAX_HEIGHT", MAX_HEIGHT, {1.9});
-    local_nh.param<double>("MIN_WIDTH", MIN_WIDTH, {0.2});
+    local_nh.param<double>("MIN_WIDTH", MIN_WIDTH, {0.4});
     local_nh.param<double>("MAX_WIDTH", MAX_WIDTH, {1.0});
+    local_nh.param<double>("MIN_LENGTH", MIN_LENGTH, {0.2});
+    local_nh.param<double>("MAX_LENGTH", MAX_LENGTH, {1.0});
     local_nh.param<double>("LIDAR_HEIGHT_FROM_GROUND", LIDAR_HEIGHT_FROM_GROUND, {1.2});
     local_nh.param<double>("LIDAR_VERTICAL_FOV_UPPER", LIDAR_VERTICAL_FOV_UPPER, {10.67 * M_PI / 180.0});
     local_nh.param<double>("LIDAR_VERTICAL_FOV_LOWER", LIDAR_VERTICAL_FOV_LOWER, {-30.67 * M_PI / 180.0});
@@ -30,6 +32,8 @@ ObstacleDetectorPCA::ObstacleDetectorPCA(void)
     std::cout << "MAX_HEIGHT: "<< MAX_HEIGHT << std::endl;
     std::cout << "MIN_WIDTH: "<< MIN_WIDTH << std::endl;
     std::cout << "MAX_WIDTH: "<< MAX_WIDTH << std::endl;
+    std::cout << "MIN_LENGTH: "<< MIN_LENGTH << std::endl;
+    std::cout << "MAX_LENGTH: "<< MAX_LENGTH << std::endl;
     std::cout << "LIDAR_HEIGHT_FROM_GROUND: "<< LIDAR_HEIGHT_FROM_GROUND << std::endl;
     std::cout << "LIDAR_VERTICAL_FOV_UPPER: "<< LIDAR_VERTICAL_FOV_UPPER << std::endl;
     std::cout << "LIDAR_VERTICAL_FOV_LOWER: "<< LIDAR_VERTICAL_FOV_LOWER << std::endl;
@@ -86,10 +90,7 @@ void ObstacleDetectorPCA::cloud_callback(const sensor_msgs::PointCloud2ConstPtr&
                 centroid(2) = scale(2) * 0.5 - LIDAR_HEIGHT_FROM_GROUND;
             }
         }
-        if(MIN_HEIGHT < scale(2) && scale(2) < MAX_HEIGHT
-           && MIN_WIDTH < scale(0) && scale(0) < MAX_WIDTH
-           && MIN_WIDTH < scale(1) && scale(1) < MAX_WIDTH
-        ){
+        if(is_human_cluster(centroid, scale)){
             bounding_box_lib::BoundingBox bb;
             bb.set_id(bbs_num);
             bb.set_frame_id(msg->header.frame_id);
@@ -232,6 +233,13 @@ void ObstacleDetectorPCA::principal_component_analysis(const CloudXYZINPtr& clus
     scale(2) = max_z - min_z;
     yaw = atan2(first_component_vector(1), first_component_vector(0));
     // std::cout << yaw << "[rad]" << std::endl;
+}
+
+bool ObstacleDetectorPCA::is_human_cluster(const Eigen::Vector3d& centroid, const Eigen::Vector3d& scale)
+{
+    return MIN_HEIGHT < scale(2) && scale(2) < MAX_HEIGHT
+           && MIN_WIDTH < scale(0) && scale(0) < MAX_WIDTH
+           && MIN_LENGTH < scale(1) && scale(1) < MAX_LENGTH;
 }
 
 void ObstacleDetectorPCA::process(void)
