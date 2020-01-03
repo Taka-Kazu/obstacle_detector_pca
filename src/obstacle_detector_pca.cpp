@@ -155,10 +155,14 @@ void ObstacleDetectorPCA::principal_component_analysis(const CloudXYZINPtr& clus
     double ave_x = 0;
     double ave_y = 0;
     double ave_z = 0;
+    double min_z = cluster->points[0].z;
+    double max_z = cluster->points[0].z;
     for(auto& pt : cluster->points){
         ave_x += pt.x;
         ave_y += pt.y;
         ave_z += pt.z;
+        min_z = std::min(min_z, (double)pt.z);
+        max_z = std::max(max_z, (double)pt.z);
     }
     ave_x /= cluster_size;
     ave_y /= cluster_size;
@@ -167,45 +171,45 @@ void ObstacleDetectorPCA::principal_component_analysis(const CloudXYZINPtr& clus
     double sigma_xx = 0;
     double sigma_xy = 0;
     double sigma_yy = 0;
-    Eigen::Vector3d max_xyz(cluster->points[0].x, cluster->points[0].y, cluster->points[0].z);;
-    Eigen::Vector3d min_xyz(cluster->points[0].x, cluster->points[0].y, cluster->points[0].z);;
     for(auto& pt : cluster->points){
         sigma_xx += (pt.x - ave_x) * (pt.x - ave_x);
         sigma_xy += (pt.x - ave_x) * (pt.y - ave_y);
         sigma_yy += (pt.y - ave_y) * (pt.y - ave_y);
-        max_xyz(0) = std::max(max_xyz(0), (double)pt.x);
-        max_xyz(1) = std::max(max_xyz(1), (double)pt.y);
-        max_xyz(2) = std::max(max_xyz(2), (double)pt.z);
-        min_xyz(0) = std::min(min_xyz(0), (double)pt.x);
-        min_xyz(1) = std::min(min_xyz(1), (double)pt.y);
-        min_xyz(2) = std::min(min_xyz(2), (double)pt.z);
     }
     sigma_xx /= cluster_size;
     sigma_xy /= cluster_size;
     sigma_yy /= cluster_size;
-    scale = max_xyz - min_xyz;
     Eigen::Matrix2d cov_mat;
     cov_mat << sigma_xx, sigma_xy,
                sigma_xy, sigma_yy;
     Eigen::EigenSolver<Eigen::Matrix2d> es(cov_mat);
     Eigen::Vector2d eigen_values = es.eigenvalues().real();
     Eigen::Matrix2d eigen_vectors = es.eigenvectors().real();
-    // std::cout << ave_x << ", " << ave_y << std::endl;
-    // std::cout << cov_mat << std::endl;
-    // std::cout << eigen_values << std::endl;
-    // std::cout << eigen_vectors << std::endl;
-    double length = max_xyz(0) - min_xyz(0);
-    double width = max_xyz(1) - min_xyz(1);
-    double height = max_xyz(2) - min_xyz(2);
-    // std::cout << length << ", " << width << ", " << height << std::endl;
     int larger_index = 0;
     if(eigen_values(0) > eigen_values(1)){
         larger_index = 0;
     }else{
         larger_index = 1;
     }
-    Eigen::Vector2d larger_vector = eigen_vectors.col(larger_index);
-    yaw = atan2(larger_vector(1), larger_vector(0));
+    Eigen::Vector2d first_component_vector = eigen_vectors.col(larger_index);
+    double min_inner_product_f = 0;
+    double max_inner_product_f = 0;
+    Eigen::Vector2d second_component_vector = eigen_vectors.col(1 - larger_index);
+    double min_inner_product_s = 0;
+    double max_inner_product_s = 0;
+    for(const auto& pt : cluster->points){
+        Eigen::Vector2d pt_v(pt.x - ave_x, pt.y - ave_y);
+        double inner_product_f = pt_v.dot(first_component_vector);
+        min_inner_product_f = std::min(min_inner_product_f, inner_product_f);
+        max_inner_product_f = std::max(max_inner_product_f, inner_product_f);
+        double inner_product_s = pt_v.dot(second_component_vector);
+        min_inner_product_s = std::min(min_inner_product_s, inner_product_s);
+        max_inner_product_s = std::max(max_inner_product_s, inner_product_s);
+    }
+    scale(0) = fabs(max_inner_product_f) + fabs(min_inner_product_f);
+    scale(1) = fabs(max_inner_product_s) + fabs(min_inner_product_s);
+    scale(2) = max_z - min_z;
+    yaw = atan2(first_component_vector(1), first_component_vector(0));
     // std::cout << yaw << "[rad]" << std::endl;
 }
 
