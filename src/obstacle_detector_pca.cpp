@@ -179,6 +179,14 @@ void ObstacleDetectorPCA::cloud_callback(const sensor_msgs::PointCloud2ConstPtr&
 
 void ObstacleDetectorPCA::get_euclidean_cluster_indices(std::vector<pcl::PointIndices>& cluster_indices)
 {
+    // set all z of points to 0
+    int size = cloud_ptr->points.size();
+    std::vector<double> z(size);
+    for(int i=0;i<size;i++){
+        z[i] = cloud_ptr->points[i].z;
+        cloud_ptr->points[i].z = 0.0;
+    }
+
     pcl::search::KdTree<PointXYZIN>::Ptr tree(new pcl::search::KdTree<PointXYZIN>);
     tree->setInputCloud(cloud_ptr);
     pcl::EuclideanClusterExtraction<PointXYZIN> ec;
@@ -189,6 +197,11 @@ void ObstacleDetectorPCA::get_euclidean_cluster_indices(std::vector<pcl::PointIn
     ec.setInputCloud(cloud_ptr);
     ec.extract(cluster_indices);
     std::cout << cluster_indices.size() << " clusters are extracted" << std::endl;
+
+    // restore z
+    for(int i=0;i<size;i++){
+        cloud_ptr->points[i].z = z[i];
+    }
 }
 
 void ObstacleDetectorPCA::get_euclidean_clusters(const std::vector<pcl::PointIndices>& cluster_indices, std::vector<CloudXYZINPtr>& clusters)
