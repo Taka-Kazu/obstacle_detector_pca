@@ -54,6 +54,8 @@ private:
     double LIDAR_HEIGHT_FROM_GROUND;
     double LIDAR_VERTICAL_FOV_UPPER;
     double LIDAR_VERTICAL_FOV_LOWER;
+    double LIDAR_LINES;
+    double LIDAR_ANGLE;
 
     ros::NodeHandle nh;
     ros::NodeHandle local_nh;

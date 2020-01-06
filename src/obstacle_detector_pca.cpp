@@ -11,10 +11,10 @@ ObstacleDetectorPCA::ObstacleDetectorPCA(void)
     cloud_sub = nh.subscribe("/velodyne_obstacles", 1, &ObstacleDetectorPCA::cloud_callback, this, ros::TransportHints().reliable().tcpNoDelay(true));
 
     local_nh.param<double>("LEAF_SIZE", LEAF_SIZE, {0.1});
-    local_nh.param<double>("TOLERANCE", TOLERANCE, {0.3});
-    local_nh.param<int>("MIN_CLUSTER_SIZE", MIN_CLUSTER_SIZE, {30});
+    local_nh.param<double>("TOLERANCE", TOLERANCE, {0.30});
+    local_nh.param<int>("MIN_CLUSTER_SIZE", MIN_CLUSTER_SIZE, {10});
     local_nh.param<int>("MAX_CLUSTER_SIZE", MAX_CLUSTER_SIZE, {2000});
-    local_nh.param<double>("MIN_HEIGHT", MIN_HEIGHT, {1.5});
+    local_nh.param<double>("MIN_HEIGHT", MIN_HEIGHT, {1.1});
     local_nh.param<double>("MAX_HEIGHT", MAX_HEIGHT, {1.9});
     local_nh.param<double>("MIN_WIDTH", MIN_WIDTH, {0.4});
     local_nh.param<double>("MAX_WIDTH", MAX_WIDTH, {1.0});
@@ -23,6 +23,9 @@ ObstacleDetectorPCA::ObstacleDetectorPCA(void)
     local_nh.param<double>("LIDAR_HEIGHT_FROM_GROUND", LIDAR_HEIGHT_FROM_GROUND, {1.2});
     local_nh.param<double>("LIDAR_VERTICAL_FOV_UPPER", LIDAR_VERTICAL_FOV_UPPER, {10.67 * M_PI / 180.0});
     local_nh.param<double>("LIDAR_VERTICAL_FOV_LOWER", LIDAR_VERTICAL_FOV_LOWER, {-30.67 * M_PI / 180.0});
+    local_nh.param<double>("LIDAR_LINES", LIDAR_LINES, {32});
+
+    LIDAR_ANGLE = (LIDAR_VERTICAL_FOV_UPPER - LIDAR_VERTICAL_FOV_LOWER) / LIDAR_LINES;
 
     cloud_ptr = CloudXYZINPtr(new CloudXYZIN);
 
@@ -39,6 +42,7 @@ ObstacleDetectorPCA::ObstacleDetectorPCA(void)
     std::cout << "LIDAR_HEIGHT_FROM_GROUND: "<< LIDAR_HEIGHT_FROM_GROUND << std::endl;
     std::cout << "LIDAR_VERTICAL_FOV_UPPER: "<< LIDAR_VERTICAL_FOV_UPPER << std::endl;
     std::cout << "LIDAR_VERTICAL_FOV_LOWER: "<< LIDAR_VERTICAL_FOV_LOWER << std::endl;
+    std::cout << "LIDAR_LINES: "<< LIDAR_LINES << std::endl;
 }
 
 void ObstacleDetectorPCA::cloud_callback(const sensor_msgs::PointCloud2ConstPtr& msg)
@@ -84,6 +88,11 @@ void ObstacleDetectorPCA::cloud_callback(const sensor_msgs::PointCloud2ConstPtr&
         Eigen::Vector3d centroid;
         Eigen::Vector3d scale;
         principal_component_analysis(clusters[i], yaw, centroid, scale);
+
+        std::cout << "centroid: " << centroid.transpose() << std::endl;
+        std::cout << "scale: " << scale.transpose() << std::endl;
+        std::cout << "cluster size: " << clusters[i]->points.size() << std::endl;;
+
         double distance = centroid.segment(0, 2).norm();
         std::cout << "distance: " << distance << std::endl;
         if(distance < INNERMOST_RING_RADIUS){
@@ -96,6 +105,23 @@ void ObstacleDetectorPCA::cloud_callback(const sensor_msgs::PointCloud2ConstPtr&
                 scale(2) = (MAX_HEIGHT + MIN_HEIGHT) * 0.5;
                 centroid(2) = scale(2) * 0.5 - LIDAR_HEIGHT_FROM_GROUND;
             }
+        }
+        double lowest = std::max(LIDAR_HEIGHT_FROM_GROUND + centroid(2) - scale(2) * 0.5, 0.0);
+        std::cout << "lowest: " << lowest << std::endl;
+        double height_error_range = distance * sin(LIDAR_ANGLE);
+        std::cout << "height_error_range: " << height_error_range << std::endl;
+        if(0 < lowest && lowest < height_error_range){
+            std::cout << "lost under part of the obstacle?" << std::endl;
+            centroid(2) -= lowest;
+            scale(2) += lowest;
+            std::cout << "centroid: " << centroid.transpose() << std::endl;
+            std::cout << "scale: " << scale.transpose() << std::endl;
+        }
+
+        std::cout << "height : " << scale(2) << std::endl;
+        if(scale(2) + height_error_range < MAX_HEIGHT){
+            scale(2) += height_error_range;
+            std::cout << "height was modified: " << scale(2) << std::endl;
         }
         if(!(MIN_HEIGHT < scale(2) && scale(2) < MAX_HEIGHT)){
             std::cout << "invalid height" << std::endl;
@@ -112,10 +138,8 @@ void ObstacleDetectorPCA::cloud_callback(const sensor_msgs::PointCloud2ConstPtr&
             bb.set_rgb(0, 200, 255);
             bb.calculate_vertices();
             bbs.markers.push_back(bb.get_bounding_box());
+            std::cout << "accepted" << std::endl;
             std::cout << "\033[32mid: " << bbs_num << "\033[0m" << std::endl;
-            std::cout << "centroid: " << centroid.transpose() << std::endl;
-            std::cout << "scale: " << scale.transpose() << std::endl;
-            std::cout << "cluster size: " << clusters[i]->points.size() << std::endl;;
             geometry_msgs::Pose p;
             p.position.x = centroid(0);
             p.position.y = centroid(1);
@@ -125,9 +149,6 @@ void ObstacleDetectorPCA::cloud_callback(const sensor_msgs::PointCloud2ConstPtr&
             bbs_num++;
         }else{
             std::cout << "rejected" << std::endl;
-            std::cout << "centroid: " << centroid.transpose() << std::endl;
-            std::cout << "scale: " << scale.transpose() << std::endl;
-            std::cout << "cluster size: " << clusters[i]->points.size() << std::endl;;
         }
     }
     std::cout << "bbs num: " << bbs_num << std::endl;
