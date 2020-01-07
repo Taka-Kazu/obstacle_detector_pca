@@ -10,7 +10,7 @@ ObstacleDetectorPCA::ObstacleDetectorPCA(void)
     obstacle_pose_pub = nh.advertise<geometry_msgs::PoseArray>("/dynamic_obstacles", 1);
     cloud_sub = nh.subscribe("/velodyne_obstacles", 1, &ObstacleDetectorPCA::cloud_callback, this, ros::TransportHints().reliable().tcpNoDelay(true));
 
-    local_nh.param<double>("LEAF_SIZE", LEAF_SIZE, {0.1});
+    local_nh.param<double>("LEAF_SIZE", LEAF_SIZE, {0.2});
     local_nh.param<double>("TOLERANCE", TOLERANCE, {0.30});
     local_nh.param<int>("MIN_CLUSTER_SIZE", MIN_CLUSTER_SIZE, {10});
     local_nh.param<int>("MAX_CLUSTER_SIZE", MAX_CLUSTER_SIZE, {2000});
@@ -101,9 +101,11 @@ void ObstacleDetectorPCA::cloud_callback(const sensor_msgs::PointCloud2ConstPtr&
             std::cout << "height_from_distance: " << height_from_distance << std::endl;
             std::cout << "height: " << scale(2) << std::endl;
             if(fabs(scale(2) - height_from_distance) < 0.05){
-                std::cout << "filled with obstacle" << std::endl;
+                std::cout << "filled with obstacle cloud" << std::endl;
                 scale(2) = (MAX_HEIGHT + MIN_HEIGHT) * 0.5;
                 centroid(2) = scale(2) * 0.5 - LIDAR_HEIGHT_FROM_GROUND;
+                std::cout << "centroid: " << centroid.transpose() << std::endl;
+                std::cout << "scale: " << scale.transpose() << std::endl;
             }
         }
         double lowest = std::max(LIDAR_HEIGHT_FROM_GROUND + centroid(2) - scale(2) * 0.5, 0.0);
