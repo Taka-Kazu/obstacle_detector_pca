@@ -14,6 +14,7 @@
 #include <pcl/point_types_conversion.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/extract_indices.h>
+#include <pcl/filters/passthrough.h>
 #include <pcl/kdtree/kdtree.h>
 #include <pcl/segmentation/extract_clusters.h>
 

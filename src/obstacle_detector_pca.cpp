@@ -57,6 +57,13 @@ void ObstacleDetectorPCA::cloud_callback(const sensor_msgs::PointCloud2ConstPtr&
     pcl::fromROSMsg(*msg, *cloud_ptr);
     std::cout << "subscribed cloud size: " << cloud_ptr->points.size() << std::endl;
 
+    pcl::PassThrough<PointXYZIN> pass;
+    pass.setInputCloud(cloud_ptr);
+    pass.setFilterFieldName("normal_z");
+    pass.setFilterLimits(0.8, 1.0);
+    pass.setFilterLimitsNegative(true);
+    pass.filter(*cloud_ptr);
+
     pcl::VoxelGrid<PointXYZIN> vg;
     vg.setInputCloud(cloud_ptr);
     vg.setLeafSize(LEAF_SIZE, LEAF_SIZE, LEAF_SIZE);
